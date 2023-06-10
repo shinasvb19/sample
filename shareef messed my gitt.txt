@@ -1,0 +1,509 @@
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useDropzone } from "react-dropzone";
+import { useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { BsLock, BsUnlock } from "react-icons/bs";
+import { countries } from "countries-list";
+import statesInIndia from "./statesInIndia";
+
+const LocationForm1 = ({ page, changePage }) => {
+  const [selectedFileField, setSelectedFileField] = useState([]);
+  const [selectedFileField1, setSelectedFileField1] = useState();
+  const [selectedFileField2, setSelectedFileField2] = useState();
+  const [image1, setImage1] = useState([]);
+  const [image2, setImage2] = useState([]);
+  const [edit, setEdit] = useState(false);
+  const [name, setName] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [err, setErr] = useState("");
+  const [countryOptions, setCountryOptions] = useState([]);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [stateOptions, setStateOptions] = useState([]);
+
+  const navigate = useNavigate();
+  useEffect(() => {
+    async function setData() {
+      setSelectedFileField([...image1, ...image2])
+    }
+    setData();
+  }, [selectedFileField1, selectedFileField2]);
+  useEffect(() => {
+    const formattedOptions = Object.keys(countries).map((countryCode) => ({
+      value: countryCode,
+      label: countries[countryCode],
+    }));
+    setCountryOptions(formattedOptions);
+  }, []);
+
+  useEffect(() => {
+    if (selectedCountry) {
+      const states = countries[selectedCountry.value];
+      const formattedOptions = states.map((state) => ({
+        value: state,
+        label: state,
+      }));
+      setStateOptions(formattedOptions);
+    } else {
+      setStateOptions([]);
+    }
+  }, [selectedCountry]);
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const queryParamValue = queryParams.get("name");
+  const queryParamId = queryParams.get("locationId");
+
+  useEffect(() => {
+    setName(queryParamValue);
+    setLocationId(queryParamId)
+  }, []);
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    formState: { errors },
+  } = useForm();
+
+  const onFirstPageSubmit = async (data, event) => {
+    const isValid = await trigger();
+
+    if (!isValid) {
+      event.preventDefault();
+      return;
+    } else if (!name || name.length < 5) {
+      setErr("Enter a valid name");
+    } else {
+
+
+      const formData = new FormData();
+      // const formData2 = new FormData();
+      for (let i = 0; i < 2; i++) {
+        formData.append('image', selectedFileField[i]);
+      }
+      // formData.append('image', selectedFileField2);
+      formData.append('name', name)
+      formData.append('locationId', locationId)
+      formData.append('parkingType', data.parkingType)
+      formData.append('email', data.email)
+      formData.append('phone', data.phone)
+      formData.append('latitude', data.longitude)
+      formData.append('street1', data.street1)
+      formData.append('street2', data.street2)
+      formData.append('city', data.city)
+      formData.append('state', data.state)
+      formData.append('country', data.country)
+      formData.append('zip', data.zip)
+
+
+      await axios
+        .post("http://localhost:3030/location/update", formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+        .then((res) => {
+          const searchParams = new URLSearchParams(location.search);
+          searchParams.set("name", name);
+          searchParams.set("locationId", locationId);
+          const newSearch = searchParams.toString();
+
+          // Navigate to the current path with the updated search string
+          navigate({
+            pathname: location.pathname,
+            search: newSearch,
+          });
+          changePage(2)
+        })
+        .catch((err) => {
+          setErr(err.response.data.details);
+          setErr(err.response.data.errMsg)
+        });
+    }
+  };
+
+  // let arr = []
+  const handleFileUpload = (file, fieldName) => {
+    console.log(file);
+    if (fieldName === 'field1') {
+      // arr[0] = file
+      setSelectedFileField1(file)
+      setImage1([file])
+
+
+    }
+    if (fieldName === 'field2') {
+      // arr[1] = file
+      setSelectedFileField2(file)
+      setImage2([file])
+    }
+    // console.log(arr)
+
+  };
+
+  const handleDrop = (acceptedFiles, fieldName) => {
+    if (acceptedFiles && acceptedFiles.length > 0) {
+      handleFileUpload(acceptedFiles[0], fieldName);
+    }
+  };
+  const { getRootProps: getRootPropsField1, getInputProps: getInputPropsField1, isDragActive: isDragActiveField1 } = useDropzone({
+    onDrop: (acceptedFiles) => handleDrop(acceptedFiles, 'field1')
+  });
+
+  const { getRootProps: getRootPropsField2, getInputProps: getInputPropsField2, isDragActive: isDragActiveField2 } = useDropzone({
+    onDrop: (acceptedFiles) => handleDrop(acceptedFiles, 'field2')
+  });
+
+
+  const inputStyle = `w-56 md:w-96 h-8 border-[#d1d5db] border rounded pl-3 dark:bg-meta-4 dark:text-white`;
+  return (
+    <form
+      onSubmit={handleSubmit(onFirstPageSubmit)}
+      className={page === 1 ? "block w-full p-5 " : "hidden"}
+    >
+      <div className="md:block lg:flex block">
+        <div className="w-full md:w-full lg:w-1/2">
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Name*</p>
+            <span>
+              {edit ? (
+                <BsUnlock
+                  className="absolute mt-2 ml-[55%] sm:md-[45%] md:ml-[43%] lg:ml-[29%] "
+                  onClick={() => setEdit(false)}
+                />
+              ) : (
+                <BsLock
+                  className="absolute ml-[55%] sm:md-[45%] md:ml-[43%] lg:ml-[29%] mt-2"
+                  onClick={() => setEdit(true)}
+                />
+              )}
+              <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                className={inputStyle}
+                onChange={(e) => setName(e.target.value)}
+                readOnly={!edit}
+              />
+
+              {err && <p className="text-danger">{err}</p>}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Location ID*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Location ID"
+                value={locationId}
+                className={inputStyle}
+                readOnly
+              />
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Parking Type*</p>
+            <span>
+              <select
+                name=""
+                className={inputStyle}
+                id=""
+                {...register("parkingType", {
+                  required: true,
+                })}
+              >
+                <option value="Pole Mounted">Pole Mounted</option>
+              </select>
+              {errors.parkingType && (
+                <p className="text-danger">
+                  {errors.parkingType.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Email*</p>
+            <span>
+              <input
+                type="email"
+                placeholder="Email"
+                className={inputStyle}
+                {...register("email", {
+                  required: true,
+                  pattern: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                })}
+              ></input>
+              {errors.email && (
+                <p className="text-danger">
+                  {errors.email.type === "required" && "This field is required"}
+                  {errors.email.type === "pattern" && "Enter a valid Email"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Phone*</p>
+            <span>
+              <input
+                type="number"
+                placeholder="Phone"
+                className={inputStyle}
+                {...register("phone", {
+                  required: true,
+                  pattern: /^[2-9]\d{2}\d{3}\d{4}$/,
+                })}
+              ></input>
+              {errors.phone && (
+                <p className="text-danger">
+                  {errors.phone.type === "required" && "This field is required"}
+                  {errors.phone.type === "pattern" &&
+                    "Enter a valid Phone number"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Image</p>
+            <span>
+              <div
+                {...getRootPropsField1()}
+                className={`dropzone ${isDragActiveField1 ? "active" : ""}`}
+              >
+                <input {...getInputPropsField1()} className={inputStyle} />
+                {selectedFileField1 ? (
+                  <div className="flex flex-col justify-center items-center w-56 md:w-96 h-50 overflow-hidden rounded">
+                    <img
+                      width={300}
+                      height={100}
+                      src={URL.createObjectURL(selectedFileField1)}
+                      alt="Selected"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col justify-center items-center w-56 md:w-96 h-50 border-[#d1d5db] border rounded">
+                    <p>Drag and drop an image here, or</p>
+                    <p>Click to browse for a file</p>
+                  </div>
+                )}
+              </div>
+            </span>
+          </label>
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Latitude*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Latitude"
+                className={inputStyle}
+                {...register("latitude", {
+                  required: true,
+                })}
+              ></input>
+              {errors.latitude && (
+                <p className="text-danger">
+                  {errors.latitude.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Longitude*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Longitude"
+                className={inputStyle}
+                {...register("longitude", {
+                  required: true,
+                })}
+              ></input>
+              {errors.longitude && (
+                <p className="text-danger">
+                  {errors.longitude.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+        </div>
+
+        <div className="w-full md:w-full lg:w-1/2 md:ml-10 ml-0">
+
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Street 1*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Street 1"
+                className={inputStyle}
+                {...register("street1", {
+                  required: true,
+                })}
+              ></input>
+              {errors.street1 && (
+                <p className="text-danger">
+                  {errors.street1.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Street 2*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Street 2"
+                className={inputStyle}
+                {...register("street2", {
+                  required: true,
+                })}
+              ></input>
+              {errors.street2 && (
+                <p className="text-danger">
+                  {errors.street2.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">City*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="City"
+                className={inputStyle}
+                {...register("city", {
+                  required: true,
+                })}
+              ></input>
+              {errors.city && (
+                <p className="text-danger">
+                  {errors.city.type === "required" && "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">State*</p>
+            <span>
+              <select
+                className={inputStyle}
+                {...register("state", {
+                  required: true,
+                })}
+              >
+                {
+                  statesInIndia.map((state) => (
+                    <option value={state.name} key={state.code} >{state.name}</option>
+                  ))
+                }
+              </select>
+              {errors.state && (
+                <p className="text-danger">
+                  {errors.state.type === "required" && "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Country*</p>
+            <span>
+              <select
+
+                className={inputStyle}
+                {...register("country", {
+                  required: true,
+                })}
+              >
+                <option value='India'>India</option>
+                {/* {
+                  countryOptions.map((country) => (
+                    <option value={country.label.name}>{country.label.name}</option>
+                  ))
+                } */}
+              </select>
+              {errors.country && (
+                <p className="text-danger">
+                  {errors.country.type === "required" &&
+                    "This field is required"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Zip*</p>
+            <span>
+              <input
+                type="text"
+                placeholder="Zip"
+                className={inputStyle}
+                {...register("zip", {
+                  required: true,
+                  pattern: /^\d{6}$/,
+                })}
+              ></input>
+              {errors.zip && (
+                <p className="text-danger">
+                  {errors.zip.type === "required" && "This field is required"}
+                  {errors.zip.type === "pattern" && "Enter a valid zip code"}
+                </p>
+              )}
+            </span>
+          </label>
+
+          <label htmlFor="" className="flex mb-6">
+            <p className="w-40">Lease/Rental Agreements*</p>
+            <span>
+              <div
+                {...getRootPropsField2()}
+                className={`dropzone ${isDragActiveField2 ? "active" : ""}`}
+              >
+                <input {...getInputPropsField2()} className={inputStyle} />
+                {selectedFileField2 ? (
+                  <div className="flex flex-col justify-center items-center w-56 md:w-96 h-50 rounded overflow-hidden">
+                    <img
+                      width={300}
+                      height={100}
+                      src={URL.createObjectURL(selectedFileField2)}
+                      alt="Selected"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col justify-center items-center w-56 md:w-96 h-50 border-[#d1d5db] border rounded">
+                    <p>Drag and drop an image here, or</p>
+                    <p>Click to browse for a file</p>
+                  </div>
+                )}
+              </div>
+            </span>
+          </label>
+
+
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          className="px-7 py-2 mt-4 border bg-warning rounded text-white"
+        >
+          Submit
+        </button>
+      </div>
+    </form>
+  );
+};
+
+export default LocationForm1;
